@@ -1,0 +1,108 @@
+port: 7890
+socks-port: 7891
+redir-port: 7892
+tproxy-port: 7893
+mixed-port: 7890
+bind-address: "*"
+mode: Rule
+log-level: info
+allow-lan: true
+external-controller: 0.0.0.0:9090
+secret: ""
+
+dns:
+  enable: true
+  ipv6: false
+  listen: 0.0.0.0:53
+  enhanced-mode: fake-ip
+  fake-ip-filter:
+    - '*.lan'
+    - 'localhost'
+  nameserver:
+    - 1.1.1.1
+    - 8.8.8.8
+  fallback:
+    - 8.8.4.4
+    - 1.0.0.1
+
+proxies:
+  - name: "Vmess_Node1"
+    type: vmess
+    server: vmess.example.com
+    port: 443
+    uuid: "your-vmess-uuid"
+    alterId: 0
+    cipher: auto
+    tls: true
+    network: ws
+    ws-opts:
+      path: "/vmess"
+      headers:
+        Host: "vmess.example.com"
+
+  - name: "VLESS_Node1"
+    type: vless
+    server: vless.example.com
+    port: 443
+    uuid: "your-vless-uuid"
+    cipher: auto
+    tls: true
+    network: ws
+    ws-opts:
+      path: "/vless"
+      headers:
+        Host: "vless.example.com"
+
+  - name: "Trojan_Node1"
+    type: trojan
+    server: trojan.example.com
+    port: 443
+    password: "your-trojan-password"
+    sni: "trojan.example.com"
+    alpn:
+      - h2
+      - http/1.1
+    skip-cert-verify: true
+    udp: true
+
+proxy-groups:
+  - name: "BestPing"
+    type: url-test
+    proxies:
+      - Vmess_Node1
+      - VLESS_Node1
+      - Trojan_Node1
+    url: "http://www.gstatic.com/generate_204"
+    interval: 300
+
+  - name: "LoadBalance"
+    type: load-balance
+    strategy: round-robin
+    proxies:
+      - Vmess_Node1
+      - VLESS_Node1
+      - Trojan_Node1
+
+  - name: "Fallback"
+    type: fallback
+    proxies:
+      - Vmess_Node1
+      - VLESS_Node1
+      - Trojan_Node1
+    url: "http://www.gstatic.com/generate_204"
+    interval: 300
+
+rule-providers:
+  oisd_big:
+    type: http
+    behavior: classical
+    path: "./rule_provider/oisd_big.yaml"
+    url: https://raw.githubusercontent.com/hillz2/openclash_adblock/main/oisd_big.yaml
+    interval: 28800 # Update rules every 8 hours
+
+rules:
+  # AdBlock
+  - RULE-SET,oisd_big,REJECT
+  
+  # Use BestPing for general browsing
+  - MATCH,BestPing
